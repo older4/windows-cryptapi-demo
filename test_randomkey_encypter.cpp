@@ -14,25 +14,13 @@ enum Mode
 	Nonhashed_Decrypt_mode,
 };
 
-typedef struct {
-	BLOBHEADER hdr;
-	DWORD keySize;
-	BYTE bytes[32];
-} aeskeyBlob;
-
 void BytesFromHexString(BYTE* data, const char* string) {
-	printf("string:%s\n", string);
 	int len = (int)strlen(string);
 	for (int i = 0; i < len; i += 2) {
 		unsigned int x;
 		sscanf((char*)(string + i), "%02x", &x);
 		data[i / 2] = x;
 	}
-	printf("byte:");
-	for (int i = 0; i < len / 2; i++) {
-		printf("%02x", data[i]);
-	}
-	printf("\n");
 }
 
 //params: <input file> <output file> <is decrypt mode> <key>
@@ -43,7 +31,7 @@ int wmain(int argc, wchar_t* argv[])
 		printf(
 			"is decrypt mode:\n"
 			"	0: Decrypt(with hase) mode\n"
-			"	1: Decrypt(with no-hase) mode\n"
+			"	1: Decrypt(from keyblob string) mode\n"
 			"	2: Encrypt mode\n"
 			"	3: Random Encrypt mode\n");
 		system("pause");
@@ -64,7 +52,7 @@ int wmain(int argc, wchar_t* argv[])
 		process_Mode = Decrypt_mode;
 	}
 	else if (argv[3][0] == L'1') {
-		printf("Decrypt(with no-hased) mode\n");
+		printf("Decrypt(from keyblob string) mode\n");
 		process_Mode = Nonhashed_Decrypt_mode;
 	}
 	else if (argv[3][0] == L'2') {
@@ -145,32 +133,38 @@ int wmain(int argc, wchar_t* argv[])
 		DWORD keyLengh = 0;
 
 		CryptExportKey(hKey, NULL, PLAINTEXTKEYBLOB, 0, NULL, &keyLengh);
-		printf("ExfilKeyLen: %d\n", keyLengh);
+		printf("KEYBLOB Length: %d\n", keyLengh);
 
 		BYTE* keyBlob = (BYTE*)malloc(keyLengh);
 		CryptExportKey(hKey, NULL, PLAINTEXTKEYBLOB, 0, keyBlob, &keyLengh);
 
-		printf("ExfilKeyData： ");
-		for (int i = 0; i < keyLengh; i++) {
+		printf("Header： ");
+		for (int i = 0; i < 12; i++) {
 			printf("%02x", keyBlob[i]);
 		}
 		printf("\n");
+
+		printf("Key： ");
+		for (int i = 12; i < keyLengh; i++) {
+			printf("%02x", keyBlob[i]);
+		}
+		printf("\n");
+
+		printf("PLAINTEXTKEYBLOB: Input the below string as a password to decrypt.\n");
+		printf("---------------------------\n");
+		for (int i = 0; i < keyLengh; i++) {
+			printf("%02x", keyBlob[i]);
+		}
+		printf("\n---------------------------\n");
 	}
-	// Gen hkey from inputted pass
+	// Gen hkey from inputted pass(CALG_AES_128)
 	else if (process_Mode == Nonhashed_Decrypt_mode) {
-		aeskeyBlob _128keyblob;
-		_128keyblob.hdr.bType = PLAINTEXTKEYBLOB;
-		_128keyblob.hdr.bVersion = CUR_BLOB_VERSION;
-		_128keyblob.hdr.reserved = 0;
-		_128keyblob.hdr.aiKeyAlg = CALG_AES_128;
-		_128keyblob.keySize = 16;
-		BYTE* keyBlob = (BYTE*)malloc(_128keyblob.keySize);
-		char* pMBBuffer = (char*)malloc(100);
+		BYTE keyBlob[28];
+		char pMBBuffer[100];
 		wcstombs(pMBBuffer, key_str, 100);
 		BytesFromHexString(keyBlob, pMBBuffer);
 
-		memcpy(_128keyblob.bytes, (BYTE*)key_str, _128keyblob.keySize);
-		if (!CryptImportKey(hProv, (BYTE*)&_128keyblob, sizeof(_128keyblob), NULL, CRYPT_EXPORTABLE, &hKey)) {
+		if (!CryptImportKey(hProv, (BYTE*)keyBlob, 28, 0, CRYPT_EXPORTABLE, &hKey)) {
 			DWORD err = GetLastError();
 			printf("CryptImportKey Failed : %#x\n", err);
 			system("pause");
@@ -248,6 +242,5 @@ int wmain(int argc, wchar_t* argv[])
 	CloseHandle(hInpFile);
 	CloseHandle(hOutFile);
 	printf("Finished. Processed %#x bytes.\n", readTotalSize);
-	system("pause");
 	return 0;
 }
