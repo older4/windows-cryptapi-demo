@@ -1,5 +1,6 @@
 # windows-cryptapi-demo
-AES encryption/decryption with Windows Crypto API
+AES encryption/decryption with Windows Crypto API.
+
 This code is fork from hasherezade's Gist(https://gist.github.com/hasherezade/2860d94910c5c5fb776edadf57f0bef6)
 
 ## defference from original
